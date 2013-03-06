@@ -2,41 +2,56 @@ require "supervisor/capistrano/version"
 
 module Supervisor
   module Capistrano
+    SUPERVISORD_OPTIONS = %w{
+      configuration
+      pidfile
+      logfile
+      logfile_maxbytes
+      logfile_backups
+      loglevel
+    }
+
     def self.extended(configuration)
       configuration.load do
-        namespace :supervisor do
-          _cset(:supervisord_configuration, "config/supervisord.conf")
-          _cset(:supervisord_logfile, "log/supervisord.log")
-          _cset(:supervisord_logfile_maxbytes, "1MB")
-          _cset(:supervisord_logfile_backups, 0)
-          _cset(:supervisord_loglevel, "info")
-          _cset(:supervisord_pidfile, "tmp/pids/supervisord.pid")
+        # Define supervisord options
+        SUPERVISORD_OPTIONS.each do |opt|
+          _cset("supervisord_#{opt}".to_sym, nil)
+        end
 
-          def build_path(path)
+        namespace :supervisor do
+          def abspath(path)
             require "pathname"
             p = Pathname.new(path)
             p.relative? ? File.join(current_path, p) : p
           end
 
+          def supervisord_cmd
+            opts = SUPERVISORD_OPTIONS
+              .map { |opt| [opt, send("supervisord_#{opt}")] }
+              .reject { |opt, value| value.nil? }
+              .map { |opt, value|
+                if %w{configuration pidfile logfile}.include?(opt)
+                  value = abspath(value)
+                end
+                [opt, value]
+              }
+
+            "supervisord #{opts.map { |opt, value| "--#{opt}=#{value}" }.join(" ")}"
+          end
+
           desc "Start Supervisor daemon"
           task :start do
-            run "supervisord " \
-                  "--configuration=#{build_path(supervisord_configuration)} " \
-                  "--logfile=#{build_path(supervisord_logfile)} " \
-                  "--logfile_maxbytes=#{supervisord_logfile_maxbytes} " \
-                  "--logfile_backups=#{supervisord_logfile_backups} " \
-                  "--loglevel=#{supervisord_loglevel} " \
-                  "--pidfile=#{build_path(supervisord_pidfile)}"
+            run supervisord_cmd
           end
 
           desc "Stop Supervisor daemon and all its subprocesses (SIGTERM)"
           task :stop do
-            run "kill -SIGTERM `cat #{supervisord_pidfile}`"
+            run "kill -SIGTERM `cat #{abspath(supervisord_pidfile)}`"
           end
 
           desc "Stop all subprocesses, reload configuration and restart (SIGHUP)"
-          task :reload do
-            run "kill -SIGHUP `cat #{supervisord_pidfile}`"
+          task :restart do
+            run "kill -SIGHUP `cat #{abspath(supervisord_pidfile)}`"
           end
         end
       end
