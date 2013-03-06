@@ -53,6 +53,11 @@ module Supervisor
           task :restart do
             run "kill -SIGHUP `cat #{abspath(supervisord_pidfile)}`"
           end
+
+          desc "Tail supervisord activity log"
+          task :tail_log do
+            stream "tail -f #{abspath(supervisord_logfile)}"
+          end
         end
       end
     end
