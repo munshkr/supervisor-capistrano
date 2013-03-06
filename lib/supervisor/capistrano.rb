@@ -39,12 +39,12 @@ module Supervisor
             "supervisord #{opts.map { |opt, value| "--#{opt}=#{value}" }.join(" ")}"
           end
 
-          desc "Start Supervisor daemon"
+          desc "Start supervisord"
           task :start do
             run supervisord_cmd
           end
 
-          desc "Stop Supervisor daemon and all its subprocesses (SIGTERM)"
+          desc "Stop supervisord and all its subprocesses (SIGTERM)"
           task :stop do
             run "kill -SIGTERM `cat #{abspath(supervisord_pidfile)}`"
           end
